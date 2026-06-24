@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Log正規分布 3スライダー</title>
+<style>
+body{font-family:Arial;margin:15px;font-size:14px;background:#fafafa;}
+input{width:100px;font-size:14px;}
+.container{margin-bottom:12px;}
+input[type=range]{width:70%;}
+canvas{border:1px solid #333;background:#fff;display:block;margin:10px auto;}
+label{display:inline-block;width:70px;}
+#msg{color:red;font-size:12px;text-align:center;}
+</style>
+</head>
+<body>
+
+<h2 style="text-align:center;">Log価格 正規分布シミュレーター</h2>
+
+<div class="container">
+S: <input id="S" value="100">
+S1: <input id="S1" value="90">
+S2: <input id="S2" value="110">
+<button id="btnCalc">計算</button>
+</div>
+
+<div class="container">
+<label>μ:</label> <input type="range" id="muSlider" min="-10" max="10" step="0.1" value="4.6">
+<span id="muValue">4.60</span>
+</div>
+<div class="container">
+<label>σ:</label> <input type="range" id="sigmaSlider" min="0.01" max="1" step="0.01" value="0.1">
+<span id="sigmaValue">0.10</span>
+</div>
+<div class="container">
+<label>x:</label> <input type="range" id="xSlider" min="-10" max="10" step="0.05" value="4.6">
+<span id="xValue">4.60</span>
+<span style="margin-left:15px;">f(x)=<span id="fxValue">0.0000</span></span>
+</div>
+
+<div class="container" style="text-align:center;">
+log(S)=<span id="logS"></span> 
+log(S1)=<span id="logS1"></span> 
+log(S2)=<span id="logS2"></span><br>
+計算μ=<span id="muResult"></span> 計算σ=<span id="sigmaResult"></span>
+</div>
+<div id="msg"></div>
+
+<canvas id="cvs" width="600" height="300"></canvas>
+
+<script>
+let mu=4.6, sigma=0.1, xPos=4.6;
+let logS=4.605, logS1=4.499, logS2=4.700;
+const cvs=document.getElementById('cvs');
+const ctx=cvs.getContext('2d');
+
+function normalPDF(x,m,s){
+return (1/(s*Math.sqrt(2*Math.PI)))*Math.exp(-0.5*Math.pow((x-m)/s,2));
+}
+
+function calc(){
+try{
+logS=Math.log(parseFloat(document.getElementById('S').value)||1);
+logS1=Math.log(parseFloat(document.getElementById('S1').value)||1);
+logS2=Math.log(parseFloat(document.getElementById('S2').value)||1);
+
+document.getElementById('logS').textContent=logS.toFixed(6);
+document.getElementById('logS1').textContent=logS1.toFixed(6);
+document.getElementById('logS2').textContent=logS2.toFixed(6);
+
+const data=[logS,logS1,logS2];
+mu=data.reduce((a,b)=>a+b)/3;
+sigma=Math.sqrt(data.reduce((sum,v)=>sum+(v-mu)*(v-mu),0)/3);
+if(sigma<0.01) sigma=0.01;
+
+document.getElementById('muResult').textContent=mu.toFixed(6);
+document.getElementById('sigmaResult').textContent=sigma.toFixed(6);
+
+// スライダー初期化
+const ms=document.getElementById('muSlider');
+ms.min=(mu-2).toFixed(1); ms.max=(mu+2).toFixed(1); ms.value=mu;
+const ss=document.getElementById('sigmaSlider');
+ss.value=sigma;
+const xs=document.getElementById('xSlider');
+xs.min=(mu-4*sigma).toFixed(2); xs.max=(mu+4*sigma).toFixed(2); xs.value=mu;
+
+updateUI();
+draw();
+}catch(e){
+document.getElementById('msg').textContent='エラー:'+e.message;
+}
+}
+
+function updateUI(){
+mu=parseFloat(document.getElementById('muSlider').value);
+sigma=parseFloat(document.getElementById('sigmaSlider').value);
+xPos=parseFloat(document.getElementById('xSlider').value);
+document.getElementById('muValue').textContent=mu.toFixed(4);
+document.getElementById('sigmaValue').textContent=sigma.toFixed(4);
+document.getElementById('xValue').textContent=xPos.toFixed(4);
+document.getElementById('fxValue').textContent=normalPDF(xPos,mu,sigma).toFixed(6);
+}
+
+function draw(){
+const w=cvs.width, h=cvs.height;
+ctx.clearRect(0,0,w,h);
+
+// 軸
+ctx.strokeStyle='#ccc';
+ctx.beginPath();
+ctx.moveTo(40,h-30); ctx.lineTo(w-20,h-30);
+ctx.moveTo(w/2,20); ctx.lineTo(w/2,h-30);
+ctx.stroke();
+
+// 分布描画
+ctx.strokeStyle='#007bff';
+ctx.lineWidth=2;
+ctx.beginPath();
+const scaleX=30, scaleY=h*0.6;
+for(let px=40; px<w-20; px++){
+const x=(px-w/2)/scaleX + mu;
+const y=normalPDF(x,mu,sigma);
+const py=h-30-y*scaleY*sigma;
+if(px===40) ctx.moveTo(px,py);
+else ctx.lineTo(px,py);
+}
+ctx.stroke();
+
+// x位置の縦線
+const px=w/2 + (xPos-mu)*scaleX;
+ctx.strokeStyle='red';
+ctx.setLineDash([5,5]);
+ctx.beginPath();
+ctx.moveTo(px,20); ctx.lineTo(px,h-30);
+ctx.stroke();
+ctx.setLineDash([]);
+
+// 3点プロット
+[[logS,'red'],[logS1,'green'],[logS2,'orange']].forEach(([v,color])=>{
+const ppx=w/2 + (v-mu)*scaleX;
+ctx.fillStyle=color;
+ctx.beginPath();
+ctx.arc(ppx,h-30,5,0,Math.PI*2);
+ctx.fill();
+});
+}
+
+// イベント登録 - DOM後に確実に
+document.getElementById('btnCalc').onclick=calc;
+document.getElementById('muSlider').oninput=function(){updateUI();draw();};
+document.getElementById('sigmaSlider').oninput=function(){
+updateUI();
+const xs=document.getElementById('xSlider');
+xs.min=(mu-4*sigma).toFixed(2); xs.max=(mu+4*sigma).toFixed(2);
+draw();
+};
+document.getElementById('xSlider').oninput=function(){updateUI();draw();};
+
+// 初期描画
+calc();
+</script>
+</body>
+</html>
